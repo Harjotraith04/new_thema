@@ -39,7 +39,8 @@ import {
   Snackbar,
   alpha,
   Fade,
-  Zoom
+  Zoom,
+  Toolbar,
 } from '@mui/material';
 import { AnimatedCard, GlassPanel, GlowButton } from './StyledComponents';
 import ThemeToggle from './ThemeToggle';
@@ -58,6 +59,8 @@ import AnalyticsIcon from '@mui/icons-material/Analytics';
 import UploadFileIcon from '@mui/icons-material/UploadFile'; // Added for upload button
 import KeyboardArrowLeftIcon from '@mui/icons-material/KeyboardArrowLeft'; // Added for toggle collapse
 import KeyboardArrowRightIcon from '@mui/icons-material/KeyboardArrowRight'; // Added for toggle expand
+import ChatBubbleOutlineIcon from '@mui/icons-material/ChatBubbleOutline'; // Added for comment button
+import LocalOfferIcon from '@mui/icons-material/LocalOffer'; // Added for assign code button
 import { styled } from '@mui/system';
 import { documentsApi, projectsApi } from '../utils/api'; // Import both the documents API and projects API
 
@@ -498,9 +501,199 @@ function Documents({
     } catch (error) {
       console.error("Error deleting document:", error);
       setFileError("Failed to delete document: " + (error.message || "Unknown error"));
+    }  };
+  
+  // State for text selection toolbar
+  const [showSelectionToolbar, setShowSelectionToolbar] = useState(false);
+  const [selectionPosition, setSelectionPosition] = useState({ top: 0, left: 0 });
+  
+  // Get surrounding context for the selection
+  const getSelectionContext = useCallback((selection) => {
+    const range = selection.getRangeAt(0);
+    const container = range.commonAncestorContainer;
+    
+    // Try to get the containing paragraph or element
+    const paragraph = container.parentElement || container;
+    return paragraph.textContent || '';
+  }, []);
+  
+  // Handle text selection in document segments
+  const handleTextSelection = useCallback((e) => {
+    // Don't process text selection if clicking inside the toolbar
+    if (e && e.target && e.target.closest('.selection-toolbar')) {
+      return;
+    }
+
+    const selection = window.getSelection();
+    
+    if (selection.toString().trim().length > 0) {
+      // Get selection range
+      const range = selection.getRangeAt(0);
+      const rect = range.getBoundingClientRect();
+      
+      // Get the active document
+      if (activeDocument) {
+        // Calculate position for the floating toolbar
+        setSelectionPosition({
+          top: rect.top - 50, // Position above the selection
+          left: rect.left + (rect.width / 2) - 75, // Center horizontally
+        });
+        
+        // Set selection data
+        const selectionData = {
+          text: selection.toString(),
+          documentId: activeDocument.id,
+          documentName: activeDocument.name,
+          context: getSelectionContext(selection),
+          timestamp: new Date().toISOString()
+        };
+        
+        setSelection(selectionData);
+        setShowSelectionToolbar(true);
+        
+        // Save to parent component's state
+        if (setSelection) {
+          setSelection(selectionData);
+        }
+      }
+    } else {
+      // Don't hide toolbar when clicking on it
+      if (e && e.target && !e.target.closest('.selection-toolbar')) {
+        setShowSelectionToolbar(false);
+      }
+    }
+  }, [activeDocument, setSelection, getSelectionContext]);
+  
+  // Handle Add Comment button click
+  const handleAddComment = () => {
+    if (selection) {
+      setCommentModalOpen(true);
+      setShowSelectionToolbar(false);
     }
   };
-
+  
+  // Handle Assign Code button click
+  const handleAssignCode = () => {
+    if (selection) {
+      setPendingCodeSelection(selection);
+      setCodesModalOpen(true);
+      setShowSelectionToolbar(false);
+    }
+  };
+  
+  // Handle saving a new comment
+  const handleSaveComment = () => {
+    if (selection && newComment) {
+      const comment = {
+        id: Date.now(), // Temporary ID until saved to backend
+        documentId: selection.documentId,
+        documentName: selection.documentName,
+        selectedText: selection.text,
+        comment: newComment,
+        timestamp: new Date().toISOString(),
+        pageContext: selection.context || ''
+      };
+      
+      // Add to comments array
+      setCommentData(prev => [...prev, comment]);
+      
+      // Close modal and reset
+      setCommentModalOpen(false);
+      setNewComment('');
+      setSelection(null);
+    }
+  };  // Attach and remove mouse up event handler for text selection
+  useEffect(() => {
+    if (activeDocument) {
+      document.addEventListener('mouseup', handleTextSelection);
+      
+      return () => {
+        document.removeEventListener('mouseup', handleTextSelection);
+      };
+    }
+  }, [activeDocument, handleTextSelection]);
+  
+  // Click outside to close the selection toolbar
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      // Only handle if toolbar is visible
+      if (showSelectionToolbar) {
+        // Clear selection on document click (but not on toolbar itself)
+        const toolbar = document.querySelector('.selection-toolbar');
+        if (toolbar && !toolbar.contains(event.target)) {
+          setShowSelectionToolbar(false);
+        }
+      }
+    };
+    
+    document.addEventListener('mousedown', handleClickOutside);
+    
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };  }, [showSelectionToolbar]);
+  
+  // Floating toolbar component for text selection actions
+  const FloatingSelectionToolbar = () => {
+    if (!showSelectionToolbar) return null;
+    
+    return (      <Paper
+        className="selection-toolbar"
+        elevation={5}
+        sx={{
+          position: 'fixed',
+          top: `${selectionPosition.top}px`,
+          left: `${selectionPosition.left}px`,
+          zIndex: 1000,
+          borderRadius: theme.shape.borderRadius * 1.5,
+          boxShadow: theme.palette.mode === 'dark'
+            ? `0 8px 20px ${alpha(theme.palette.common.black, 0.4)}`
+            : `0 8px 20px ${alpha(theme.palette.common.black, 0.2)}`,
+          transform: 'translate(-50%, -100%)',
+          p: 0.7,
+          display: 'flex',
+          gap: 1,
+        }}
+      >
+        <Tooltip title="Add Comment">
+          <Button
+            variant="contained"
+            color="primary"
+            startIcon={<ChatBubbleOutlineIcon />}
+            onClick={handleAddComment}
+            size="small"
+            sx={{
+              borderRadius: theme.shape.borderRadius * 1.5,
+              fontWeight: 600,
+              fontSize: '0.75rem',
+              minWidth: 'auto',
+              px: 1.5
+            }}
+          >
+            Add Comment
+          </Button>
+        </Tooltip>
+        <Tooltip title="Assign Code">
+          <Button
+            variant="contained"
+            color="secondary"
+            startIcon={<LocalOfferIcon />}
+            onClick={handleAssignCode}
+            size="small"
+            sx={{
+              borderRadius: theme.shape.borderRadius * 1.5,
+              fontWeight: 600,
+              fontSize: '0.75rem',
+              minWidth: 'auto',
+              px: 1.5
+            }}
+          >
+            Assign Code
+          </Button>
+        </Tooltip>
+      </Paper>
+    );
+  };
+  
   return (
     <Box sx={{ 
       display: 'flex', 
@@ -1041,8 +1234,7 @@ function Documents({
                             }}
                           />
                         )}
-                      </Box>
-                      <Typography 
+                      </Box>                      <Typography 
                         variant="body1" 
                         sx={{ 
                           whiteSpace: 'pre-wrap',
@@ -1052,6 +1244,11 @@ function Documents({
                           color: theme.palette.mode === 'dark' 
                             ? theme.palette.text.primary 
                             : theme.palette.text.primary,
+                          userSelect: 'text', // Ensure text is selectable
+                          cursor: 'text', // Show text cursor
+                        }}                        onMouseUp={(e) => {
+                          e.stopPropagation(); // Prevent event bubbling
+                          handleTextSelection(e);
                         }}
                       >
                         {segment.content}
@@ -1093,6 +1290,67 @@ function Documents({
           </Box>
         )}
       </Box>
+      
+      {/* Floating toolbar for text selection */}
+      <FloatingSelectionToolbar />
+      
+      {/* Comment Modal */}
+      <Dialog open={commentModalOpen} onClose={() => setCommentModalOpen(false)} maxWidth="sm" fullWidth>
+        <DialogTitle>Add Comment</DialogTitle>
+        <DialogContent>
+          <Typography variant="subtitle1" gutterBottom>
+            Selected Text:
+          </Typography>
+          <Paper
+            elevation={0}
+            sx={{
+              p: 2,
+              mb: 2,
+              bgcolor: alpha(theme.palette.warning.main, 0.07),
+              color: theme.palette.mode === 'dark' ? theme.palette.warning.light : theme.palette.warning.dark,
+              borderRadius: theme.shape.borderRadius,
+              position: 'relative',
+              pl: 3,
+              '&::before': {
+                content: '""',
+                position: 'absolute',
+                left: 0,
+                top: 0,
+                bottom: 0,
+                width: '4px',
+                borderTopLeftRadius: theme.shape.borderRadius,
+                borderBottomLeftRadius: theme.shape.borderRadius,
+                backgroundColor: theme.palette.warning.main,
+              }
+            }}
+          >
+            <Typography fontStyle="italic">
+              {selection?.text}
+            </Typography>
+          </Paper>
+          <Typography variant="subtitle1" gutterBottom>
+            Your Comment:
+          </Typography>
+          <TextField
+            autoFocus
+            margin="dense"
+            id="comment"
+            fullWidth
+            multiline
+            rows={4}
+            variant="outlined"
+            value={newComment}
+            onChange={(e) => setNewComment(e.target.value)}
+            placeholder="Add your comment or annotation here..."
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setCommentModalOpen(false)}>Cancel</Button>
+          <Button onClick={handleSaveComment} variant="contained" color="primary">
+            Save Comment
+          </Button>
+        </DialogActions>
+      </Dialog>
       
       {/* Error snackbar */}
       <Snackbar 
