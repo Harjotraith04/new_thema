@@ -46,12 +46,12 @@ function Navigation({ activeMenuItem, handleMenuItemClick, selectedFiles, docume
     }
   }, [isExpanded, onNavigationToggle]);
 
-  // Sample selected files for demonstration
-  const sampleFiles = [
-    { id: 1, name: 'Research Notes', date: '6/12/2025' },
-    { id: 2, name: 'Interview Data', date: '6/13/2025' },
-    { id: 3, name: 'Analysis Draft', date: '6/14/2025' },
-  ];
+  // Debug log of documents received from props
+  useEffect(() => {
+    if (documents && Array.isArray(documents)) {
+      console.log(`Navigation received ${documents.length} documents:`, documents);
+    }
+  }, [documents]);
 
   const menuItems = [
     {
@@ -95,10 +95,6 @@ function Navigation({ activeMenuItem, handleMenuItemClick, selectedFiles, docume
   // Add event-catching overlay to prevent navigation from disappearing
   const [isDraggingOver, setIsDraggingOver] = useState(false);
   
-  // Use actual files if they're passed as props
-  const displayFiles = selectedFiles?.length > 0 ? selectedFiles : sampleFiles;
-
-  // Make sure navigation stays visible during drag operations
   useEffect(() => {
     const handleDragOver = (e) => {
       // Don't prevent default as we want the Files component to handle drops
@@ -134,24 +130,26 @@ function Navigation({ activeMenuItem, handleMenuItemClick, selectedFiles, docume
     };
   }, []);
 
-  // Render document files in navigation
+  // Render document files in navigation - use real documents from backend
   const renderDocumentFilesList = () => {
-    const filesToDisplay = selectedFiles?.length > 0 ? selectedFiles : sampleFiles;
+    // Use the documents array from props if available, otherwise show empty state
+    const documentsToDisplay = documents && Array.isArray(documents) && documents.length > 0
+      ? documents
+      : [];
     
     return (
       <List disablePadding>
-        {filesToDisplay.map((file) => (
+        {documentsToDisplay.length > 0 ? documentsToDisplay.map((doc) => (
           <ListItem 
-            key={file.id || file._id || file.name}
+            key={doc.id || doc._id}
             button
             onClick={(e) => {
               e.preventDefault();
-              e.stopPropagation();
-              if (setActiveFile) {
-                setActiveFile(file);
-              }
+              e.stopPropagation();              // Set selected document ID for the parent Dashboard component
               if (onDocumentSelect) {
-                onDocumentSelect(file);
+                // Make sure we pass the document ID first, followed by the document object
+                console.log(`Navigation: Selected document with ID ${doc.id}`);
+                onDocumentSelect(doc.id, doc);
               }
             }}
             sx={{ 
@@ -167,14 +165,14 @@ function Navigation({ activeMenuItem, handleMenuItemClick, selectedFiles, docume
                 transform: 'translateX(2px)',
               },
               transition: 'all 0.2s ease',
-              backgroundColor: (activeFile && (activeFile.id === file.id || activeFile._id === file._id || activeFile.name === file.name)) 
+              backgroundColor: (activeFile === doc.id) 
                 ? alpha(theme.palette.primary.main, 0.15)
                 : 'transparent',
             }}
           >
             <ListItemIcon sx={{ minWidth: 36 }}>
               <FilePresentIcon fontSize="small" sx={{ 
-                color: (activeFile && (activeFile.id === file.id || activeFile._id === file._id || activeFile.name === file.name))
+                color: (activeFile === doc.id)
                   ? theme.palette.primary.main 
                   : theme.palette.text.secondary 
               }} />
@@ -192,12 +190,12 @@ function Navigation({ activeMenuItem, handleMenuItemClick, selectedFiles, docume
                   whiteSpace: 'nowrap',
                   overflow: 'hidden',
                   textOverflow: 'ellipsis',
-                  color: (activeFile && (activeFile.id === file.id || activeFile._id === file._id || activeFile.name === file.name))
+                  color: (activeFile === doc.id)
                     ? theme.palette.primary.main
                     : theme.palette.text.primary,
                 }}
               >
-                {file.name || file.fileName || file.title || 'Untitled File'}
+                {doc.name || doc.file_name || 'Untitled Document'}
               </Typography>
               <Typography 
                 sx={{ 
@@ -205,15 +203,14 @@ function Navigation({ activeMenuItem, handleMenuItemClick, selectedFiles, docume
                   color: 'text.secondary'
                 }}
               >
-                {file.date || file.uploadDate || file.createdAt || new Date().toLocaleDateString()}
+                {new Date(doc.created_at || doc.uploadDate || doc.upload_date || new Date()).toLocaleDateString()}
               </Typography>
             </Box>
           </ListItem>
-        ))}
-        {filesToDisplay.length === 0 && (
+        )) : (
           <ListItem sx={{ py: 2, justifyContent: 'center' }}>
             <Typography variant="body2" color="text.secondary" textAlign="center">
-              No files selected yet
+              No documents uploaded yet
             </Typography>
           </ListItem>
         )}
@@ -479,9 +476,8 @@ function Navigation({ activeMenuItem, handleMenuItemClick, selectedFiles, docume
                         justifyContent: 'center',
                       }}>
                         <FolderIcon fontSize="small" sx={{ color: theme.palette.primary.dark }} />
-                      </ListItemIcon>
-                      <ListItemText 
-                        primary="Selected Files"
+                      </ListItemIcon>                      <ListItemText 
+                        primary="Project Documents"
                         primaryTypographyProps={{
                           fontWeight: 500,
                           fontSize: '0.9rem',
@@ -490,9 +486,7 @@ function Navigation({ activeMenuItem, handleMenuItemClick, selectedFiles, docume
                           textOverflow: 'ellipsis',
                         }}
                       />
-                    </ListItem>
-
-                    {/* Files List */}
+                    </ListItem>                    {/* Files List */}
                     <Box sx={{ 
                       maxHeight: '250px', 
                       overflowY: 'auto',

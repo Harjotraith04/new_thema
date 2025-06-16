@@ -201,57 +201,33 @@ function Dashboard() {
       setActiveFile(newFiles.length > 0 ? newFiles[0].name : null);
     }
   };
-  
-  // Handle document selection from navigation
-  const handleDocumentSelect = (documentId, fileObject) => {
+    // Handle document selection from navigation
+  const handleDocumentSelect = (documentId, documentObject) => {
     // Ensure we're on the Documents page
     setActiveMenuItem('Documents');
     
-    console.log('Document selected:', documentId, 'with fileObject:', !!fileObject);
+    console.log('Document selected:', documentId, 'with document object:', !!documentObject);
     
-    // If file object is provided, update the document with the file object
-    if (fileObject) {
-      // Save this file in selectedFiles if not already there
-      if (!selectedFiles.some(f => f.name === fileObject.name)) {
-        console.log('Adding file to selectedFiles:', fileObject.name);
-        setSelectedFiles(prevFiles => [...prevFiles, fileObject]);
-      }
-      
-      if (documentId) {
-        // Update the document with the file object
-        const updatedDocs = documents.map(doc => {
-          if (doc.id === documentId) {
-            // Store the fileObject in document
-            return {...doc, fileObject};
-          }
-          return doc;
-        });
-        setDocuments(updatedDocs);
-      } else {
-        // We have a file but no document ID - might be a direct file selection
-        // Check if we have a document that matches this file name
-        const fileName = fileObject.name;
-        const matchingDoc = documents.find(doc => 
-          doc.filename === fileName || doc.title === fileName
-        );
-        
-        if (matchingDoc) {
-          // Update the matching document
-          const updatedDocs = documents.map(doc => {
-            if (doc.id === matchingDoc.id) {
-              return {...doc, fileObject};
-            }
-            return doc;
-          });
-          setDocuments(updatedDocs);
-          setSelectedDocumentId(matchingDoc.id);
-          return; // Exit early since we've set the document ID
-        }
-      }
+    if (!documentId) {
+      console.error('No document ID provided for selection');
+      return;
+    }
+
+    // Find the document in our array
+    const selectedDoc = documents.find(doc => doc.id === documentId);
+    
+    if (!selectedDoc) {
+      console.error(`Document with ID ${documentId} not found`);
+      return;
     }
     
     // Set the selected document ID which will be picked up by Documents component
     setSelectedDocumentId(documentId);
+    
+    // Set this document as active
+    setActiveFile(documentId);
+    
+    console.log(`Selected document ${documentId} (${selectedDoc.name || selectedDoc.file_name || 'Untitled'}) for display`);
   };
 
   // Speed dial actions
