@@ -59,7 +59,7 @@ import UploadFileIcon from '@mui/icons-material/UploadFile'; // Added for upload
 import KeyboardArrowLeftIcon from '@mui/icons-material/KeyboardArrowLeft'; // Added for toggle collapse
 import KeyboardArrowRightIcon from '@mui/icons-material/KeyboardArrowRight'; // Added for toggle expand
 import { styled } from '@mui/system';
-import { documentsApi } from '../utils/api'; // Import the documents API
+import { documentsApi, projectsApi } from '../utils/api'; // Import both the documents API and projects API
 
 // Custom theme augmentation
 const getCustomTheme = (theme) => {
@@ -269,33 +269,32 @@ function Documents({
       fetchProjectDocuments();
     }
   }, [projectId, documents]);
-  
-  // Fetch documents function
+    // Fetch documents function using the comprehensive project endpoint
   const fetchProjectDocuments = async () => {
     if (!projectId) return;
     
     setIsLoading(true);
     try {
-      console.log(`Fetching documents for project ${projectId} directly from API`);
-      const fetchedDocuments = await documentsApi.getProjectDocuments(projectId);
-      console.log("API returned documents:", fetchedDocuments);
+      console.log(`Fetching project ${projectId} with all document data from API`);
+      const projectData = await projectsApi.getProjectWithContent(projectId);
+      console.log("API returned comprehensive project data:", projectData);
       
-      if (fetchedDocuments && Array.isArray(fetchedDocuments)) {
-        console.log(`Setting ${fetchedDocuments.length} documents to state`);
-        setProjectDocuments(fetchedDocuments);
+      if (projectData && projectData.documents && Array.isArray(projectData.documents)) {
+        console.log(`Setting ${projectData.documents.length} documents to state`);
+        setProjectDocuments(projectData.documents);
+        
+        // Update parent component state if provided
+        if (setDocuments) {
+          setDocuments(projectData.documents);
+        }
+        
+        // Call callback if provided (safely check if it exists and is a function)
+        if (typeof onDocumentsUpdated === 'function') {
+          onDocumentsUpdated(projectData.documents);
+        }
       } else {
-        console.warn("API didn't return an array of documents:", fetchedDocuments);
+        console.warn("Project data didn't include documents array:", projectData);
         setProjectDocuments([]);
-      }
-      
-      // Update parent component state if provided
-      if (setDocuments) {
-        setDocuments(fetchedDocuments);
-      }
-      
-      // Call callback if provided (safely check if it exists and is a function)
-      if (typeof onDocumentsUpdated === 'function') {
-        onDocumentsUpdated(fetchedDocuments);
       }
       
       // Refresh sidebar if callback provided
@@ -303,13 +302,12 @@ function Documents({
         refreshSidebar();
       }
     } catch (error) {
-      console.error("Error fetching documents:", error);
-      setUploadError("Failed to fetch documents");
+      console.error("Error fetching project data:", error);
+      setUploadError("Failed to fetch project data");
     } finally {
       setIsLoading(false);
     }
-  };
-  // Handle document selection
+  };  // Handle document selection
   const handleDocumentSelect = (doc) => {
     console.log("Selected document:", doc);
     setActiveFile(doc.id);
@@ -319,35 +317,19 @@ function Documents({
     // Debug logging to help troubleshoot
     console.log("Complete document object:", doc);
     
-    // Check if the document has segments
-    if (doc.segments && Array.isArray(doc.segments) && doc.segments.length > 0) {
+    // With comprehensive project API, the document should already have segments
+    if (doc.segments && Array.isArray(doc.segments)) {
       console.log(`Document has ${doc.segments.length} segments:`, doc.segments);
       setDocumentSegments(doc.segments);
       setLoadingDocument(false);
     } else {
-      // If segments are not present in the document object, try to fetch them
-      const fetchDocumentWithSegments = async () => {
-        try {
-          console.log(`Fetching document ${doc.id} to get segments`);
-          const documentDetails = await documentsApi.getDocument(doc.id);
-          console.log("Fetched document details:", documentDetails);
-          
-          if (documentDetails.segments && Array.isArray(documentDetails.segments)) {
-            console.log(`Fetched ${documentDetails.segments.length} segments for document ${doc.id}`);
-            setDocumentSegments(documentDetails.segments);
-          } else {
-            console.warn("API didn't return segments for document:", doc.id);
-            setDocumentSegments([]);
-          }
-        } catch (error) {
-          console.error(`Error fetching document segments for ${doc.id}:`, error);
-          setDocumentSegments([]);
-        } finally {
-          setLoadingDocument(false);
-        }
-      };
+      console.warn("Document doesn't have segments array:", doc);
+      setDocumentSegments([]);
+      setLoadingDocument(false);
       
-      fetchDocumentWithSegments();
+      // If we somehow ended up with a document without segments, refetch the whole project
+      // to ensure we have the most up-to-date data with all segments
+      fetchProjectDocuments();
     }
   };
   
@@ -441,8 +423,7 @@ function Documents({
       throw error;
     }
   };
-  
-  // Handle upload of all selected files
+    // Handle upload of all selected files
   const handleUpload = async () => {
     if (!projectId) {
       setUploadError("No project selected. Please select a project first.");
@@ -477,7 +458,7 @@ function Documents({
       setActiveFile(null);
       setUploadSuccess(true);
       
-      // Refresh documents list
+      // Refresh project data to get the updated documents with segments
       await fetchProjectDocuments();
       
     } catch (error) {
@@ -487,8 +468,7 @@ function Documents({
       setUploading(false);
     }
   };
-  
-  // Handle document deletion
+    // Handle document deletion
   const handleDeleteDocument = async (documentId) => {
     if (!projectId || !documentId) {
       console.error("Project ID and Document ID are required for deletion");
@@ -501,26 +481,18 @@ function Documents({
     
     try {
       console.log(`Deleting document ${documentId} from project ${projectId}`);
-      await documentsApi.deleteDocument(projectId, documentId);
-      
-      // Update UI state
-      setProjectDocuments(prev => prev.filter(doc => doc.id !== documentId));
+      await documentsApi.deleteDocument(documentId);
       
       // If the deleted document was the active one, clear active document
       if (activeFile === documentId) {
         setActiveFile(null);
         setActiveDocument(null);
+        setDocumentSegments([]);
       }
       
-      // Update parent component state if provided
-      if (setDocuments) {
-        setDocuments(prev => prev.filter(doc => doc.id !== documentId));
-      }
-      
-      // Refresh sidebar if callback provided
-      if (typeof refreshSidebar === 'function') {
-        refreshSidebar();
-      }
+      // Fetch fresh project data to ensure we have the most up-to-date document list
+      // This will update all states via the fetchProjectDocuments function
+      await fetchProjectDocuments();
       
       console.log("Document deleted successfully");
     } catch (error) {
