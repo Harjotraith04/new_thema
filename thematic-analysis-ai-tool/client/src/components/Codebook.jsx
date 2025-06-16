@@ -30,18 +30,11 @@ import BookmarkBorderIcon from '@mui/icons-material/BookmarkBorder';
 import { EnhancedTableRow, GlowButton, FrostedGlassPaper } from './StyledComponents';
 
 function Codebook({ codeAssignments }) {
-  const theme = useTheme();
-  const [searchQuery, setSearchQuery] = useState('');
+  const theme = useTheme();  const [searchQuery, setSearchQuery] = useState('');
   const [selectedRow, setSelectedRow] = useState(null);
   
-  // Sample code categories for demonstration
-  const codeCategories = [
-    { name: 'Emotions', color: '#8B5CF6' },
-    { name: 'Behaviors', color: '#10B981' },
-    { name: 'Processes', color: '#3B82F6' },
-    { name: 'Concepts', color: '#F59E0B' },
-    { name: 'Relations', color: '#EC4899' }
-  ];
+  // Extract unique codes from assignments for the code chips
+  const uniqueCodes = Array.from(new Set(codeAssignments.map(assignment => assignment.code)));
 
   const handleSearchChange = (event) => {
     setSearchQuery(event.target.value);
@@ -138,24 +131,30 @@ function Codebook({ codeAssignments }) {
           </Box>
         </Box>
       </Fade>
-      
-      <Fade in={true} style={{ transitionDelay: '200ms' }}>
+        <Fade in={true} style={{ transitionDelay: '200ms' }}>
         <Box sx={{ mb: 3, display: 'flex', gap: 1, overflowX: 'auto', pb: 1 }}>
-          {codeCategories.map((category) => (
-            <Chip
-              key={category.name}
-              label={category.name}
-              sx={{
-                borderRadius: '16px',
-                backgroundColor: alpha(category.color, 0.15),
-                color: category.color,
-                fontWeight: 500,
-                '&:hover': {
-                  backgroundColor: alpha(category.color, 0.25),
-                }
-              }}
-            />
-          ))}
+          {uniqueCodes.length > 0 ? uniqueCodes.map((code) => {
+            const codeColor = getRandomColor(code);
+            return (
+              <Chip
+                key={code}
+                label={code}
+                sx={{
+                  borderRadius: '16px',
+                  backgroundColor: alpha(codeColor, 0.15),
+                  color: codeColor,
+                  fontWeight: 500,
+                  '&:hover': {
+                    backgroundColor: alpha(codeColor, 0.25),
+                  }
+                }}
+              />
+            );
+          }) : (
+            <Typography variant="body2" color="text.secondary">
+              No codes have been created yet
+            </Typography>
+          )}
         </Box>
       </Fade>
       
@@ -292,17 +291,18 @@ function Codebook({ codeAssignments }) {
                                     {assignment.timestamp}
                                   </Typography>
                                 </Box>
-                                
-                                <Box>
+                                  <Box>
                                   <Typography variant="subtitle2" gutterBottom>
-                                    Category
+                                    Code
                                   </Typography>
                                   <Chip 
-                                    label={codeCategories[Math.floor(Math.random() * codeCategories.length)].name}
+                                    label={assignment.code}
                                     size="small"
                                     sx={{ 
                                       height: '22px',
                                       fontSize: '0.75rem',
+                                      backgroundColor: alpha(getRandomColor(assignment.code), 0.15),
+                                      color: getRandomColor(assignment.code),
                                     }}
                                   />
                                 </Box>
