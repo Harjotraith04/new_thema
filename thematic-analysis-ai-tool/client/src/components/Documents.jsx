@@ -649,13 +649,11 @@ function Documents({
                 >
                   {fileError}
                 </Alert>
-              )}
-
-              {selectedFiles.length > 0 && (
+              )}              {selectedFiles.length > 0 && (
                 <Button
                   variant="contained"
                   fullWidth
-                  onClick={handleUploadFiles}
+                  onClick={handleUpload}
                   disabled={uploading}
                   startIcon={uploading ? <CircularProgress size={16} color="inherit" /> : <UploadFileIcon />}
                   sx={{
