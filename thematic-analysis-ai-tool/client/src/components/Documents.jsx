@@ -56,6 +56,8 @@ import BookOutlinedIcon from '@mui/icons-material/BookOutlined';
 import SaveIcon from '@mui/icons-material/Save';
 import AnalyticsIcon from '@mui/icons-material/Analytics';
 import UploadFileIcon from '@mui/icons-material/UploadFile'; // Added for upload button
+import KeyboardArrowLeftIcon from '@mui/icons-material/KeyboardArrowLeft'; // Added for toggle collapse
+import KeyboardArrowRightIcon from '@mui/icons-material/KeyboardArrowRight'; // Added for toggle expand
 import { styled } from '@mui/system';
 import { documentsApi } from '../utils/api'; // Import the documents API
 
@@ -184,6 +186,8 @@ function Documents({
   const theme = useTheme();
   const { themeMode } = useContext(ThemeModeContext);
   const customTheme = useMemo(() => getCustomTheme(theme), [theme]);
+  // State to control panel expansion (true = expanded, false = collapsed)
+  const [isPanelExpanded, setIsPanelExpanded] = useState(true);
   
   // Enhanced button style - used throughout component
   const enhancedButtonStyle = {
@@ -347,6 +351,17 @@ function Documents({
     }
   };
   
+  // Handle file change when using the browse option
+  const handleSelectFiles = (event) => {
+    const files = Array.from(event.target.files);
+    if (files && files.length > 0) {
+      setSelectedFiles([...selectedFiles, ...files]);
+      if (!activeFile) {
+        setActiveFile(files[0].name);
+      }
+    }
+  };
+
   // File change handler - just for UI
   const handleFileChange = (event) => {
     const files = Array.from(event.target.files);
@@ -521,289 +536,379 @@ function Documents({
       height: '100%',
       overflow: 'hidden'
     }}>
-      {/* Left panel - file upload and document list */}
+      {/* Left panel - file upload and document list - with animation */}
       <Box sx={{
-        width: { xs: '100%', sm: 280 },
+        width: { 
+          xs: '100%',
+          sm: isPanelExpanded ? 280 : 50 // Width changes based on expansion state
+        },
         height: { xs: 'auto', sm: '100%' },
         borderRight: 1,
         borderColor: 'divider',
         overflow: 'hidden',
         display: 'flex',
-        flexDirection: 'column'
+        flexDirection: 'column',
+        transition: 'width 0.3s ease', // Smooth transition when expanding/collapsing
+        position: 'relative'
       }}>
-        {/* Upload section */}
+        {/* Header with Toggle Button */}
         <Box sx={{
           p: 2,
           borderBottom: 1,
           borderColor: 'divider',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between'
         }}>
-          <Typography variant="h6" gutterBottom sx={{ fontSize: '1.1rem' }}>
-            Documents
-          </Typography>
-          
-          <DropzoneArea 
-            isdragging={isDragging.toString()}
-            onDrop={handleDrop}
-            onDragOver={handleDragOver}
-            onDragLeave={handleDragLeave}
-            onClick={() => document.getElementById('file-input').click()}
-            sx={{ mb: 2 }}
+          {isPanelExpanded ? (
+            <Typography variant="h6" gutterBottom sx={{ fontSize: '1.1rem', mb: 0 }}>
+              Documents
+            </Typography>
+          ) : null}
+          <IconButton 
+            onClick={() => setIsPanelExpanded(prev => !prev)}
+            size="small"
+            sx={{ 
+              ml: 'auto',
+              color: theme.palette.primary.main,
+              '&:hover': {
+                backgroundColor: theme.palette.mode === 'dark'
+                  ? alpha(theme.palette.primary.main, 0.15)
+                  : alpha(theme.palette.primary.main, 0.1),
+              }
+            }}
+            aria-label={isPanelExpanded ? "Collapse panel" : "Expand panel"}
           >
-            <input
-              id="file-input"
-              type="file"
-              style={{ display: 'none' }}
-              onChange={handleFileChange}
-              multiple
-            />
-            <CloudUploadIcon sx={{ fontSize: 40, color: theme.palette.primary.main, mb: 1 }} />
-            <Typography variant="body1" sx={{ fontWeight: 500 }}>
-              Drag & Drop Files
-            </Typography>
-            <Typography variant="body2" color="textSecondary">
-              or click to browse
-            </Typography>
-            <Typography variant="caption" color="textSecondary" sx={{ mt: 1 }}>
-              Supports text, PDF, DOCX, CSV files
-            </Typography>
-          </DropzoneArea>
-          
-          {selectedFiles.length > 0 && (
-            <Button
-              variant="contained"
-              startIcon={<UploadFileIcon />}
-              onClick={handleUpload}
-              fullWidth
-              disabled={uploading}
-              sx={{
-                ...enhancedButtonStyle,
-                py: 1,
-              }}
-            >
-              {uploading ? (
-                <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                  <CircularProgress size={20} color="inherit" sx={{ mr: 1 }} />
-                  <span>Uploading...</span>
-                </Box>
-              ) : (
-                `Upload ${selectedFiles.length} ${selectedFiles.length > 1 ? 'Files' : 'File'}`
-              )}
-            </Button>
-          )}
+            {isPanelExpanded ? <KeyboardArrowLeftIcon /> : <KeyboardArrowRightIcon />}
+          </IconButton>
         </Box>
         
-        {/* Document list */}
-        <Box sx={{ flexGrow: 1, overflow: 'auto', p: 1 }}>
-          {/* Selected files for upload */}
-          {selectedFiles.length > 0 && (
-            <>
-              <Typography 
-                variant="subtitle2" 
-                sx={{ 
-                  px: 2, 
-                  pt: 1, 
-                  pb: 1, 
-                  color: theme.palette.text.secondary,
-                  fontSize: '0.85rem',
-                  fontWeight: 600,
-                  letterSpacing: 0.5
-                }}
-              >
-                Selected Files
-              </Typography>
-              
-              {selectedFiles.map((file) => {
-                const fileName = file.name;
-                const fileExtension = fileName.split('.').pop().toLowerCase();
-                const isActive = activeFile === fileName;
-                
-                return (
-                  <ListItem
-                    key={fileName}
-                    disablePadding
-                    sx={{
-                      mb: 0.5,
-                      borderRadius: theme.shape.borderRadius,
-                      backgroundColor: isActive
-                        ? alpha(theme.palette.primary.main, theme.palette.mode === 'dark' ? 0.2 : 0.1)
-                        : 'transparent',
-                      transition: 'all 0.2s ease',
-                    }}
-                  >
-                    <ListItemButton
-                      onClick={() => handleFileSelect(fileName)}
-                      dense
-                      sx={{
-                        borderRadius: theme.shape.borderRadius,
-                        py: 1,
-                        '&:hover': {
-                          backgroundColor: isActive
-                            ? alpha(theme.palette.primary.main, theme.palette.mode === 'dark' ? 0.3 : 0.15)
-                            : alpha(theme.palette.primary.main, theme.palette.mode === 'dark' ? 0.1 : 0.05),
-                        },
-                      }}
-                    >
-                      <ListItemIcon sx={{ minWidth: 36 }}>
-                        {getFileIcon(fileExtension, { 
-                          fontSize: 'small',
-                          color: isActive ? 'primary' : 'inherit',
-                        })}
-                      </ListItemIcon>
-                      <ListItemText 
-                        primary={fileName}
-                        primaryTypographyProps={{
-                          noWrap: true,
-                          sx: {
-                            fontWeight: isActive ? 500 : 400,
-                            fontSize: '0.9rem',
-                            color: isActive 
-                              ? theme.palette.primary.main
-                              : theme.palette.text.primary
-                          }
-                        }}
-                      />
-                      <IconButton 
-                        size="small" 
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleRemoveFile(fileName);
-                        }}
-                        sx={{
-                          color: theme.palette.mode === 'dark' 
-                            ? theme.palette.grey[400] 
-                            : theme.palette.grey[700],
-                          '&:hover': {
-                            color: theme.palette.error.main,
-                          }
-                        }}
-                      >
-                        <CloseIcon fontSize="small" />
-                      </IconButton>
-                    </ListItemButton>
-                  </ListItem>
-                );
-              })}
-              
-              <Divider sx={{ my: 2 }} />
-            </>
-          )}
-          
-          {/* Uploaded Documents Section */}
-          {projectDocuments.length > 0 && (
-            <>
-              <Typography 
-                variant="subtitle2" 
-                sx={{ 
-                  px: 2, 
-                  pt: 1, 
-                  pb: 1, 
-                  color: theme.palette.text.secondary,
-                  fontSize: '0.85rem',
-                  fontWeight: 600,
-                  letterSpacing: 0.5
-                }}
-              >
-                Uploaded Documents
-              </Typography>
-              
-              {projectDocuments.map((doc) => {
-                const fileName = doc.name;
-                const fileExtension = doc.document_type.toLowerCase();
-                const isActive = activeFile === doc.id;
-                
-                return (
-                  <ListItem
-                    key={`doc-${doc.id}`}
-                    disablePadding
-                    sx={{
-                      mb: 0.5,
-                      borderRadius: theme.shape.borderRadius,
-                      backgroundColor: isActive
-                        ? alpha(theme.palette.primary.main, theme.palette.mode === 'dark' ? 0.2 : 0.1)
-                        : 'transparent',
-                      transition: 'all 0.2s ease',
-                    }}
-                  >
-                    <ListItemButton
-                      onClick={() => handleDocumentSelect(doc)}
-                      dense
-                      sx={{
-                        borderRadius: theme.shape.borderRadius,
-                        py: 1,
-                        '&:hover': {
-                          backgroundColor: isActive
-                            ? alpha(theme.palette.primary.main, theme.palette.mode === 'dark' ? 0.3 : 0.15)
-                            : alpha(theme.palette.primary.main, theme.palette.mode === 'dark' ? 0.1 : 0.05),
-                        },
-                      }}
-                    >
-                      <ListItemIcon sx={{ minWidth: 36 }}>
-                        {getFileIcon(fileExtension, { 
-                          fontSize: 'small',
-                          color: isActive ? 'primary' : 'inherit',
-                        })}
-                      </ListItemIcon>
-                      <ListItemText 
-                        primary={fileName}
-                        primaryTypographyProps={{
-                          noWrap: true,
-                          sx: {
-                            fontWeight: isActive ? 500 : 400,
-                            fontSize: '0.9rem',
-                            color: isActive 
-                              ? theme.palette.primary.main
-                              : theme.palette.text.primary
-                          }
-                        }}
-                      />
-                      <IconButton 
-                        size="small" 
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleDeleteDocument(doc.id);
-                        }}
-                        sx={{
-                          color: theme.palette.mode === 'dark' 
-                            ? theme.palette.grey[400] 
-                            : theme.palette.grey[700],
-                          '&:hover': {
-                            color: theme.palette.error.main,
-                          }
-                        }}
-                      >
-                        <DeleteIcon fontSize="small" />
-                      </IconButton>
-                    </ListItemButton>
-                  </ListItem>
-                );
-              })}
-            </>
-          )}
-          
-          {selectedFiles.length === 0 && projectDocuments.length === 0 && !isLoading && (
-            <Box sx={{ 
-              display: 'flex', 
-              flexDirection: 'column', 
-              alignItems: 'center', 
-              justifyContent: 'center',
-              height: '100%',
-              p: 3,
-              textAlign: 'center',
-              opacity: 0.7
+        {/* Only show content when expanded */}
+        {isPanelExpanded && (
+          <>
+            {/* Upload section */}
+            <Box sx={{
+              p: 2,
+              borderBottom: 1,
+              borderColor: 'divider',
             }}>
-              <ArticleIcon sx={{ fontSize: 48, color: 'text.disabled', mb: 2 }} />
-              <Typography variant="body1" color="textSecondary">
-                No documents yet. Upload files to get started.
-              </Typography>
+              <DropzoneArea 
+                isdragging={isDragging.toString()}
+                onDrop={handleDrop}
+                onDragOver={handleDragOver}
+                onDragLeave={handleDragLeave}
+                onClick={() => document.getElementById('file-input').click()}
+                sx={{ mb: 2 }}
+              >
+                <CloudUploadIcon 
+                  color="primary" 
+                  sx={{ 
+                    fontSize: 40, 
+                    mb: 1,
+                    filter: theme.palette.mode === 'dark' ? 'drop-shadow(0 0 8px rgba(64,195,255,0.4))' : 'none'
+                  }} 
+                />
+                <Typography variant="body1" component="div">
+                  Drag & Drop Files
+                </Typography>
+                <Typography variant="body2" color="textSecondary">
+                  or click to browse
+                </Typography>
+                <Typography 
+                  variant="caption" 
+                  color="textSecondary" 
+                  sx={{ mt: 1, fontSize: '0.75rem' }}
+                >
+                  Supports text, PDF, DOCX, CSV files
+                </Typography>
+                <input
+                  id="file-input"
+                  type="file"
+                  multiple
+                  onChange={handleSelectFiles}
+                  style={{ display: 'none' }}
+                  accept=".pdf,.docx,.doc,.csv,.xlsx,.xls,.txt"
+                />
+              </DropzoneArea>
+
+              {uploadError && (
+                <Alert 
+                  severity="error" 
+                  sx={{ mt: 1, mb: 2 }} 
+                  onClose={() => setUploadError(null)}
+                >
+                  {uploadError}
+                </Alert>
+              )}
+
+              {fileError && (
+                <Alert 
+                  severity="warning" 
+                  sx={{ mt: 1, mb: 2 }} 
+                  onClose={() => setFileError(null)}
+                >
+                  {fileError}
+                </Alert>
+              )}
+
+              {selectedFiles.length > 0 && (
+                <Button
+                  variant="contained"
+                  fullWidth
+                  onClick={handleUploadFiles}
+                  disabled={uploading}
+                  startIcon={uploading ? <CircularProgress size={16} color="inherit" /> : <UploadFileIcon />}
+                  sx={{
+                    ...enhancedButtonStyle,
+                    py: 1,
+                    bgcolor: theme.palette.primary.main,
+                  }}
+                >
+                  {uploading 
+                    ? `Uploading ${selectedFiles.length} file${selectedFiles.length > 1 ? 's' : ''}...` 
+                    : `Upload ${selectedFiles.length} file${selectedFiles.length > 1 ? 's' : ''}`
+                  }
+                </Button>
+              )}
             </Box>
-          )}
           
-          {isLoading && (
-            <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}>
-              <CircularProgress size={30} />
+            {/* File list section */}
+            <Box sx={{
+              flexGrow: 1,
+              overflowY: 'auto',
+              px: 1,
+              py: 1.5,
+            }}>
+              {/* Selected files section */}
+              {selectedFiles.length > 0 && (
+                <>
+                  <Typography 
+                    variant="subtitle2" 
+                    sx={{ 
+                      px: 2, 
+                      pt: 1, 
+                      pb: 1, 
+                      color: theme.palette.text.secondary,
+                      fontSize: '0.85rem',
+                      fontWeight: 600,
+                      letterSpacing: 0.5
+                    }}
+                  >
+                    Selected Files
+                  </Typography>
+                  
+                  {selectedFiles.map((file) => {
+                    const fileName = file.name;
+                    const fileExtension = fileName.split('.').pop().toLowerCase();
+                    const isActive = activeFile === fileName;
+                    
+                    return (
+                      <ListItem
+                        key={fileName}
+                        disablePadding
+                        sx={{
+                          mb: 0.5,
+                          borderRadius: theme.shape.borderRadius,
+                          backgroundColor: isActive
+                            ? alpha(theme.palette.primary.main, theme.palette.mode === 'dark' ? 0.2 : 0.1)
+                            : 'transparent',
+                          transition: 'all 0.2s ease',
+                        }}
+                      >
+                        <ListItemButton
+                          onClick={() => handleFileSelect(fileName)}
+                          dense
+                          sx={{
+                            borderRadius: theme.shape.borderRadius,
+                            py: 1,
+                            '&:hover': {
+                              backgroundColor: isActive
+                                ? alpha(theme.palette.primary.main, theme.palette.mode === 'dark' ? 0.3 : 0.15)
+                                : alpha(theme.palette.primary.main, theme.palette.mode === 'dark' ? 0.1 : 0.05),
+                            },
+                          }}
+                        >
+                          <ListItemIcon sx={{ minWidth: 36 }}>
+                            {getFileIcon(fileExtension, { 
+                              fontSize: 'small',
+                              color: isActive ? 'primary' : 'inherit',
+                            })}
+                          </ListItemIcon>
+                          <ListItemText 
+                            primary={fileName}
+                            primaryTypographyProps={{
+                              noWrap: true,
+                              sx: {
+                                fontWeight: isActive ? 500 : 400,
+                                fontSize: '0.9rem',
+                                color: isActive 
+                                  ? theme.palette.primary.main
+                                  : theme.palette.text.primary
+                              }
+                            }}
+                          />
+                          <IconButton 
+                            size="small" 
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleRemoveFile(fileName);
+                            }}
+                            sx={{
+                              color: theme.palette.mode === 'dark' 
+                                ? theme.palette.grey[400] 
+                                : theme.palette.grey[700],
+                              '&:hover': {
+                                color: theme.palette.error.main,
+                              }
+                            }}
+                          >
+                            <CloseIcon fontSize="small" />
+                          </IconButton>
+                        </ListItemButton>
+                      </ListItem>
+                    );
+                  })}
+                  
+                  <Divider sx={{ my: 2 }} />
+                </>
+              )}
+              
+              {/* Uploaded Documents Section */}
+              {projectDocuments.length > 0 && (
+                <>
+                  <Typography 
+                    variant="subtitle2" 
+                    sx={{ 
+                      px: 2, 
+                      pt: 1, 
+                      pb: 1, 
+                      color: theme.palette.text.secondary,
+                      fontSize: '0.85rem',
+                      fontWeight: 600,
+                      letterSpacing: 0.5
+                    }}
+                  >
+                    Uploaded Documents
+                  </Typography>
+                  
+                  {projectDocuments.map((document) => {
+                    const isActive = activeDocument && activeDocument.id === document.id;
+                    return (
+                      <ListItem
+                        key={document.id}
+                        disablePadding
+                        sx={{
+                          mb: 0.5,
+                          borderRadius: theme.shape.borderRadius,
+                          backgroundColor: isActive
+                            ? alpha(theme.palette.primary.main, theme.palette.mode === 'dark' ? 0.2 : 0.1)
+                            : 'transparent',
+                          transition: 'all 0.2s ease',
+                        }}
+                      >
+                        <ListItemButton
+                          onClick={() => handleDocumentSelect(document)}
+                          dense
+                          sx={{
+                            borderRadius: theme.shape.borderRadius,
+                            py: 1,
+                            '&:hover': {
+                              backgroundColor: isActive
+                                ? alpha(theme.palette.primary.main, theme.palette.mode === 'dark' ? 0.3 : 0.15)
+                                : alpha(theme.palette.primary.main, theme.palette.mode === 'dark' ? 0.1 : 0.05),
+                            },
+                          }}
+                        >
+                          <ListItemIcon sx={{ minWidth: 36 }}>
+                            {getFileIcon(document.document_type, { 
+                              fontSize: 'small',
+                              color: isActive ? 'primary' : 'inherit',
+                            })}
+                          </ListItemIcon>
+                          <ListItemText 
+                            primary={document.name}
+                            primaryTypographyProps={{
+                              noWrap: true,
+                              sx: {
+                                fontWeight: isActive ? 500 : 400,
+                                fontSize: '0.9rem',
+                                color: isActive 
+                                  ? theme.palette.primary.main
+                                  : theme.palette.text.primary
+                              }
+                            }}
+                          />
+                          <IconButton 
+                            size="small" 
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDeleteDocument(document.id);
+                            }}
+                            sx={{
+                              color: theme.palette.mode === 'dark' 
+                                ? theme.palette.grey[400] 
+                                : theme.palette.grey[700],
+                              '&:hover': {
+                                color: theme.palette.error.main,
+                              }
+                            }}
+                          >
+                            <DeleteIcon fontSize="small" />
+                          </IconButton>
+                        </ListItemButton>
+                      </ListItem>
+                    );
+                  })}
+                </>
+              )}
+              
+              {projectDocuments.length === 0 && !uploading && (
+                <Box sx={{ 
+                  p: 2, 
+                  textAlign: 'center', 
+                  color: theme.palette.text.secondary,
+                  height: '100%',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  justifyContent: 'center',
+                  alignItems: 'center'
+                }}>
+                  <ArticleIcon sx={{ fontSize: 40, opacity: 0.4, mb: 2 }} />
+                  <Typography variant="body2">
+                    No documents uploaded yet
+                  </Typography>
+                  <Typography variant="caption" sx={{ mt: 1 }}>
+                    Upload documents to get started
+                  </Typography>
+                </Box>
+              )}
             </Box>
-          )}
-        </Box>
+          </>
+        )}
+        {!isPanelExpanded && (
+          <Box sx={{ 
+            position: 'relative',
+            height: '100%',
+            display: 'flex', 
+            flexDirection: 'column', 
+            alignItems: 'center', 
+            pt: 2 
+          }}>
+            <Typography 
+              variant="body2" 
+              sx={{ 
+                transform: 'rotate(-90deg)', 
+                whiteSpace: 'nowrap', 
+                position: 'absolute', 
+                top: '50%', 
+                left: -40, 
+                color: theme.palette.text.secondary 
+              }}
+            >
+              Documents
+            </Typography>
+          </Box>
+        )}
       </Box>
       
       {/* Right panel - document content */}
